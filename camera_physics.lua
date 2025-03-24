@@ -1,7 +1,7 @@
 obs = obslua
 
 function script_description()
-    return "模拟真实镜头的晃动和缩放模糊效果。选择视频源后生效（需配合 zoom_blur.shader https://github.com/exeldro/obs-shaderfilter）。@B站大成子ONLYYOU"
+    return "模拟真实镜头的晃动和缩放模糊效果。选择视频源后生效（需配合 zoom_blur.shader）。可通过开关启用/禁用。\n作者：@B站大成子ONLY"
 end
 
 local source_name = ""
@@ -10,6 +10,7 @@ local shake_frequency = 0.5
 local blur_strength = 0.5
 local samples_value = 32
 local speed_percent_value = 0
+local enable_script = true  -- 新增开关，默认启用
 local timer = 0
 local log_timer = 0
 local offset_x = 0
@@ -29,6 +30,7 @@ function script_properties()
         end
     end
     obs.source_list_release(sources)
+    obs.obs_properties_add_bool(props, "enable_script", "启用脚本")  -- 新增开关属性
     obs.obs_properties_add_float_slider(props, "shake_amplitude", "晃动幅度", 0.0, 20.0, 0.1)
     obs.obs_properties_add_float_slider(props, "shake_frequency", "晃动频率", 0.01, 1.0, 0.01)
     obs.obs_properties_add_float_slider(props, "blur_strength", "模糊强度", 0.0, 1.0, 0.01)
@@ -38,7 +40,7 @@ function script_properties()
 end
 
 function script_defaults(settings)
-    -- 设置默认值，确保 OBS 识别
+    obs.obs_data_set_default_bool(settings, "enable_script", true)  -- 默认启用
     obs.obs_data_set_default_double(settings, "shake_amplitude", 3.0)
     obs.obs_data_set_default_double(settings, "shake_frequency", 0.5)
     obs.obs_data_set_default_double(settings, "blur_strength", 0.5)
@@ -48,34 +50,43 @@ end
 
 function script_update(settings)
     source_name = obs.obs_data_get_string(settings, "source_name")
+    enable_script = obs.obs_data_get_bool(settings, "enable_script")  -- 获取开关状态
     shake_amplitude = obs.obs_data_get_double(settings, "shake_amplitude")
     shake_frequency = obs.obs_data_get_double(settings, "shake_frequency")
     blur_strength = obs.obs_data_get_double(settings, "blur_strength")
     samples_value = obs.obs_data_get_int(settings, "samples_value")
     speed_percent_value = obs.obs_data_get_int(settings, "speed_percent_value")
     
-    -- 查找并初始化场景项
     local scene = obs.obs_frontend_get_current_scene()
     if scene ~= nil then
         local scene_obj = obs.obs_scene_from_source(scene)
         sceneitem = obs.obs_scene_find_source(scene_obj, source_name)
         if sceneitem ~= nil then
             local pos = obs.vec2()
-            obs.vec2_set(pos, 0, 0)  -- 强制初始位置为 (0, 0)
+            if enable_script then
+                obs.vec2_set(pos, 0, 0)  -- 启用时初始化位置
+            else
+                obs.vec2_set(pos, 0, 0)  -- 禁用时重置位置
+            end
             obs.obs_sceneitem_set_pos(sceneitem, pos)
         end
         obs.obs_source_release(scene)
     end
     
-    -- 初始化滤镜参数
     local source = obs.obs_get_source_by_name(source_name)
     if source ~= nil then
         local filter = obs.obs_source_get_filter_by_name(source, "zoom_blur_filter")
         if filter ~= nil then
             local filter_settings = obs.obs_data_create()
-            obs.obs_data_set_double(filter_settings, "magnitude", blur_strength)
-            obs.obs_data_set_int(filter_settings, "samples", math.max(samples_value, 1))
-            obs.obs_data_set_int(filter_settings, "speed_percent", speed_percent_value)
+            if enable_script then
+                obs.obs_data_set_double(filter_settings, "magnitude", blur_strength)
+                obs.obs_data_set_int(filter_settings, "samples", math.max(samples_value, 1))
+                obs.obs_data_set_int(filter_settings, "speed_percent", speed_percent_value)
+            else
+                obs.obs_data_set_double(filter_settings, "magnitude", 0.0)  -- 禁用时模糊强度为 0
+                obs.obs_data_set_int(filter_settings, "samples", 1)        -- 最小采样
+                obs.obs_data_set_int(filter_settings, "speed_percent", 0)  -- 无动画
+            end
             obs.obs_source_update(filter, filter_settings)
             obs.obs_data_release(filter_settings)
         end
@@ -88,6 +99,8 @@ local function lerp(a, b, t)
 end
 
 function script_tick(seconds)
+    if not enable_script then return end  -- 禁用时直接退出
+    
     timer = timer + seconds
     log_timer = log_timer + seconds
     
@@ -109,7 +122,6 @@ function script_tick(seconds)
         obs.obs_sceneitem_set_pos(sceneitem, pos)
     end
     
-    -- 更新缩放模糊
     local source = obs.obs_get_source_by_name(source_name)
     if source ~= nil then
         local filter = obs.obs_source_get_filter_by_name(source, "zoom_blur_filter")
@@ -122,10 +134,12 @@ function script_tick(seconds)
             obs.obs_data_set_int(settings, "speed_percent", speed_percent_value)
             obs.obs_source_update(filter, settings)
             
+
             if log_timer >= 1.0 then
                 print("Dynamic blur value: " .. dynamic_blur .. ", Samples: " .. samples_value .. ", Speed Percent: " .. speed_percent_value)
                 log_timer = 0
             end
+
             
             obs.obs_data_release(settings)
         else
@@ -145,7 +159,6 @@ function script_load(settings)
     offset_y = 0
     last_offset_x = 0
     last_offset_y = 0
-    -- 加载时强制更新
     script_update(settings)
 end
 
