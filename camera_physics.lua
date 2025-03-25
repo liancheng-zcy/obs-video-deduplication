@@ -1,7 +1,7 @@
 obs = obslua
 
 function script_description()
-    return "模拟真实镜头的晃动和缩放模糊效果。选择视频源后生效（需配合 zoom_blur.shader）。可通过开关启用/禁用。\n作者：@B站大成子ONLY"
+    return "模拟真实镜头的晃动和缩放模糊效果。选择视频源后生效（需配合 zoom_blur.shader）。可通过开关启用/禁用。\n作者：@B站大成子ONLYYOU\nhttps://space.bilibili.com/341867068"
 end
 
 local source_name = ""
