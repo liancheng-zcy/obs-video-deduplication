@@ -13,14 +13,14 @@
 - 支持缩放模糊效果
 - 提供开关控制，实时启用/禁用效果
 
-![camera_physics](https://raw.githubusercontent.com/liancheng-zcy/obs-video-deduplication/main/static/camera_physics.png)
+![camera_physics](https://liancheng-zcy.github.io/obs-video-deduplication/static/camera_physics.png)
 
 - 如何配合zoom_blur.shader 使用？ 
   - 首先安装OBS ShaderFilter，可直接到releases界面使用exe文件进行安装。安装之后的路径在obs根目录下的[path\to\obs-studio\data\obs-plugins\obs-shaderfilter]
   - zoom_blur.shader位于[path\to\obs-studio\data\obs-plugins\obs-shaderfilter\examples]
   -在OBS里添加滤镜
 
-![zoom_blur_shader](https://raw.githubusercontent.com/liancheng-zcy/obs-video-deduplication/main/static/zoom_blur_shader.png)
+![zoom_blur_shader](https://liancheng-zcy.github.io/obs-video-deduplication/static/zoom_blur_shader.png)
 
 ### video_color.lua
 - 动态调整视频色彩参数
@@ -28,7 +28,7 @@
 - 支持平滑过渡效果
 - 提供开关控制，实时启用/禁用滤镜
 
-![video_color](https://raw.githubusercontent.com/liancheng-zcy/obs-video-deduplication/main/static/video_color.png)
+![video_color](https://liancheng-zcy.github.io/obs-video-deduplication/static/video_color.png)
 
 
 ## 安装方法 Installation
