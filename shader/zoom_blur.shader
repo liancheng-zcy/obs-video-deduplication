@@ -47,6 +47,13 @@ float Styler(float t, float b, float c, float d, bool ease) {
 }
 
 float4 mainImage(VertData v_in) : TARGET {
+    float4 c0 = image.Sample(textureSampler, v_in.uv);  // 获取原始颜色
+
+    // 当 magnitude = 0.0 或 samples <= 1 时，直接返回原始颜色
+    if (magnitude == 0.0 || samples <= 1) {
+        return c0;
+    }
+
     float speed = speed_percent * 0.01;
     float t = 1.0 + sin(elapsed_time * speed);  // t 范围 0-2
     float b = 0.0;
@@ -57,8 +64,6 @@ float4 mainImage(VertData v_in) : TARGET {
     b = Styler(t, 0, c, d, ease);  // b 范围 0-1
 
     float PI = 3.1415926535897932384626433832795;
-    float4 c0 = image.Sample(textureSampler, v_in.uv);
-
     float xTrans = (v_in.uv.x * 2) - 1;
     float yTrans = 1 - (v_in.uv.y * 2);
     float angle = atan(yTrans / xTrans) + PI;
@@ -68,9 +73,8 @@ float4 mainImage(VertData v_in) : TARGET {
     float radius = sqrt(pow(xTrans, 2) + pow(yTrans, 2));
 
     float4 accumulatedColor = c0;  // 初始颜色
-    int fixed_samples = max(samples, 1);  // 新增：固定采样次数，不随 b 变化
+    int fixed_samples = max(samples, 1);  // 确保采样次数至少为 1
     for (int i = 1; i < fixed_samples; i++) {
-        // 修改：加快模糊响应，增加 magnitude 权重，b 控制动画幅度
         float currentRadius = max(0, radius - (radius / 1000 * i * magnitude * 1.5 * b));
         float2 currentCoord;
         currentCoord.x = (currentRadius * cos(angle) + 1.0) / 2.0;
@@ -79,7 +83,7 @@ float4 mainImage(VertData v_in) : TARGET {
         accumulatedColor += currentColor;
     }
 
-    // 修改：固定归一化，除以固定采样次数，解决亮度波动
+    // 固定归一化，除以采样次数+1
     accumulatedColor /= float(fixed_samples + 1);
     accumulatedColor = clamp(accumulatedColor, 0.0, 1.0);  // 保持颜色限制
     accumulatedColor.a = 1.0;
