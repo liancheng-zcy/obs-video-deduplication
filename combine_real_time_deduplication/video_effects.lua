@@ -2,12 +2,12 @@ obs = obslua
 
 -- 动态获取脚本目录
 local script_dir = script_path():match("(.*[/\\])")
-local license_file_path = script_dir .. "license.key"
-local last_time_file = script_dir .. "last_run.txt"
-local license_expiration_date = "请激活使用完整功能，未激活只能看到轻微的晃动和模糊，色彩不生效"
-local license_valid = false
+local license_file_path = script_dir .. "license.key"  -- 许可证文件路径
+local last_time_file = script_dir .. "last_run.txt"    -- 上次运行时间记录文件
+local license_expiration_date = "请激活使用完整功能，未激活只能看到轻微的晃动和模糊，色彩不生效"  -- 默认许可证到期时间
+local license_valid = false  -- 许可证是否有效
 
--- 异或操作
+-- 异或操作，用于解密许可证
 local function xor(a, b)
     local result = 0
     local bit = 1
@@ -24,6 +24,7 @@ local function xor(a, b)
     return result
 end
 
+-- 使用异或解密数据
 local function xor_decrypt(data, key)
     local result = ""
     for i = 1, #data do
@@ -34,7 +35,7 @@ local function xor_decrypt(data, key)
     return result
 end
 
--- 哈希函数
+-- 简单哈希函数，用于验证许可证完整性
 local function simple_hash(str)
     local hash = 0
     for i = 1, #str do
@@ -43,7 +44,7 @@ local function simple_hash(str)
     return tostring(hash)
 end
 
--- 许可证验证
+-- 验证许可证文件
 local function verify_license(file_path)
     local file = io.open(file_path, "r")
     if not file then
@@ -86,7 +87,7 @@ local function verify_license(file_path)
     return current_time <= expiration_time
 end
 
--- 时间篡改检测
+-- 检查时间篡改，防止用户修改系统时间绕过许可证
 local last_check_time = 0
 local time_check_interval = 10
 local time_tampering_detected = false
@@ -116,7 +117,10 @@ local function check_time_tampering()
     return true
 end
 
--- 脚本描述
+-- 在全局作用域验证许可证，确保 script_description 使用更新后的值
+license_valid = verify_license(license_file_path)
+
+-- 脚本描述，显示在 OBS 脚本界面
 function script_description()
     return "视频滤镜去重与晃动模糊效果脚本V1.0\n" ..
            "安装步骤：\n" ..
@@ -127,7 +131,7 @@ function script_description()
            "联系方式：V:LiAnChenglac/@B站大成子ONLYYO"
 end
 
--- 脚本属性
+-- 定义脚本属性界面，供用户配置参数
 function script_properties()
     local props = obs.obs_properties_create()
     local source_list = obs.obs_properties_add_list(props, "source", "视频源", obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING)
@@ -167,11 +171,12 @@ function script_properties()
     obs.obs_properties_add_int_slider(props, "shake_samples_value", "采样次数（模糊）", 0, 100, 1)
     obs.obs_properties_add_int_slider(props, "shake_speed_percent_value", "动画速度（模糊） (%)", 0, 100, 1)
     obs.obs_properties_add_float_slider(props, "shake_blur_speed_factor", "模糊晃动关联度", 0.0, 1.0, 0.01)
+    obs.obs_properties_add_int(props, "shake_update_interval", "晃动模糊更新间隔 (毫秒)", 50, 1000, 50)
 
     return props
 end
 
--- 默认参数
+-- 设置默认参数
 function script_defaults(settings)
     obs.obs_data_set_default_bool(settings, "dedup_enabled", true)
     obs.obs_data_set_default_bool(settings, "dedup_enable_offset", true)
@@ -195,40 +200,46 @@ function script_defaults(settings)
     obs.obs_data_set_default_double(settings, "shake_blur_speed_factor", 0.2)
     obs.obs_data_set_default_int(settings, "shake_samples_value", 32)
     obs.obs_data_set_default_int(settings, "shake_speed_percent_value", 0)
+    obs.obs_data_set_default_int(settings, "shake_update_interval", 100)
 end
 
 -- 全局变量
-local source_name = ""
-local dedup_last_update = 0
-local dedup_filter = nil
-local settings = nil
-local dedup_current_params = {offset = 0, brightness = 0, contrast = 0, saturation = 1}
-local dedup_target_params = {offset = 0, brightness = 0, contrast = 0, saturation = 1}
-local dedup_transition_time = 0
-local dedup_transition_duration = 1000
-local dedup_log_timer = 0
-local shake_amplitude = 3.0
-local shake_frequency = 0.5
-local shake_blur_strength = 0.5
-local shake_blur_speed_factor = 0.2
-local shake_samples_value = 32
-local shake_speed_percent_value = 0
-local shake_enabled = true
-local shake_timer = 0
-local shake_log_timer = 0
-local shake_offset_x = 0
-local shake_offset_y = 0
-local shake_velocity_x = 0
-local shake_velocity_y = 0
-local shake_damping = 0.95
-local shake_sceneitem = nil
+local source_name = ""  -- 选择的视频源名称
+local dedup_last_update = 0  -- 上次去重滤镜更新时间
+local dedup_filter = nil  -- 去重滤镜对象
+local settings = nil  -- 脚本设置
+local dedup_current_params = {offset = 0, brightness = 0, contrast = 0, saturation = 1}  -- 当前去重参数
+local dedup_target_params = {offset = 0, brightness = 0, contrast = 0, saturation = 1}  -- 目标去重参数
+local dedup_transition_time = 0  -- 去重参数过渡时间
+local dedup_transition_duration = 1000  -- 去重参数过渡持续时间
+local dedup_log_timer = 0  -- 去重日志计时器
+local dedup_removed_logged = false  -- 是否已记录去重滤镜移除
+local dedup_init_skip_logged = false  -- 是否已记录初始化跳过
+local shake_amplitude = 3.0  -- 晃动幅度
+local shake_frequency = 0.5  -- 晃动频率
+local shake_blur_strength = 0.5  -- 模糊强度
+local shake_blur_speed_factor = 0.2  -- 模糊与晃动速度关联度
+local shake_samples_value = 32  -- 模糊采样次数
+local shake_speed_percent_value = 0  -- 模糊动画速度百分比
+local shake_enabled = true  -- 是否启用晃动效果
+local shake_timer = 0  -- 晃动计时器
+local shake_log_timer = 0  -- 晃动日志计时器
+local shake_offset_x = 0  -- X轴晃动偏移
+local shake_offset_y = 0  -- Y轴晃动偏移
+local shake_velocity_x = 0  -- X轴晃动速度
+local shake_velocity_y = 0  -- Y轴晃动速度
+local shake_damping = 0.95  -- 晃动阻尼系数
+local shake_sceneitem = nil  -- 晃动场景项
+local shake_last_update = 0  -- 上次晃动更新时间
+local shake_update_interval = 100  -- 晃动更新间隔（毫秒）
+local shake_disabled_logged = false  -- 是否已记录晃动关闭
 
--- 工具函数
+-- 生成指定范围内的随机数
 local function random_range(min, max)
     return min + (max - min) * math.random()
 end
 
--- 滤镜去重函数
+-- 检查是否所有去重调整均被禁用
 local function dedup_all_adjustments_disabled()
     if not settings then return true end
     return not obs.obs_data_get_bool(settings, "dedup_enable_offset") and
@@ -237,12 +248,17 @@ local function dedup_all_adjustments_disabled()
            not obs.obs_data_get_bool(settings, "dedup_enable_saturation")
 end
 
+-- 更新去重滤镜参数
 local function dedup_update_filter()
     if not dedup_filter or not settings then
-        print("[滤镜去重] 滤镜或设置未初始化，跳过更新")
+        if not dedup_init_skip_logged then
+            print("[滤镜去重] 滤镜或设置未初始化，跳过更新")
+            dedup_init_skip_logged = true
+        end
         return
     end
 
+    dedup_init_skip_logged = false  -- 重置标志，当滤镜和设置有效时允许下次提示
     if not obs.obs_data_get_bool(settings, "dedup_enabled") or dedup_all_adjustments_disabled() then
         local source = obs.obs_get_source_by_name(source_name)
         if source and dedup_filter then
@@ -252,11 +268,15 @@ local function dedup_update_filter()
         if dedup_filter then
             obs.obs_source_release(dedup_filter)
             dedup_filter = nil
-            print("[滤镜去重] 去重滤镜已关闭并移除")
+            if not dedup_removed_logged then
+                print("[滤镜去重] 去重滤镜已关闭，跳过更新")
+                dedup_removed_logged = true
+            end
         end
         return
     end
 
+    dedup_removed_logged = false  -- 重置标志，当滤镜重新启用时允许再次提示
     dedup_log_timer = dedup_log_timer + 100
     if dedup_log_timer >= 2000 then
         local offset_status = obs.obs_data_get_bool(settings, "dedup_enable_offset") and "开启" or "关闭"
@@ -286,6 +306,7 @@ local function dedup_update_filter()
     end
 end
 
+-- 创建去重滤镜并添加到视频源
 local function dedup_create_filter(source)
     if not source then
         print("[滤镜去重] 无效视频源")
@@ -308,7 +329,7 @@ local function dedup_create_filter(source)
     return true
 end
 
--- 晃动模糊函数
+-- 更新晃动模糊滤镜参数
 local function shake_update_filter(source)
     if not source then return end
     local filter = obs.obs_source_get_filter_by_name(source, "zoom_blur_filter")
@@ -334,13 +355,14 @@ local function shake_update_filter(source)
             print(string.format("[晃动模糊] 动态模糊: %.4f, 速度: %.4f", dynamic_blur, speed))
             shake_log_timer = 0
         end
+        shake_disabled_logged = false  -- 重置关闭提示标志
     else
         obs.obs_data_set_double(filter_settings, "magnitude", 0.0)
         obs.obs_data_set_int(filter_settings, "samples", 1)
         obs.obs_data_set_int(filter_settings, "speed_percent", 0)
-        if shake_log_timer >= 1.0 then
+        if not shake_disabled_logged then
             print("[晃动模糊] 晃动模糊效果已关闭")
-            shake_log_timer = 0
+            shake_disabled_logged = true
         end
     end
     obs.obs_source_update(filter, filter_settings)
@@ -348,7 +370,7 @@ local function shake_update_filter(source)
     obs.obs_source_release(filter)
 end
 
--- 脚本更新
+-- 处理脚本配置更新
 function script_update(settings_data)
     settings = settings_data
 
@@ -383,10 +405,11 @@ function script_update(settings_data)
     shake_blur_speed_factor = obs.obs_data_get_double(settings, "shake_blur_speed_factor")
     shake_samples_value = obs.obs_data_get_int(settings, "shake_samples_value")
     shake_speed_percent_value = obs.obs_data_get_int(settings, "shake_speed_percent_value")
+    shake_update_interval = obs.obs_data_get_int(settings, "shake_update_interval")
 
     local source = obs.obs_get_source_by_name(source_name)
     if source then
-        dedup_update_filter() -- 检查开关状态并移除滤镜（如果需要）
+        dedup_update_filter()
         shake_update_filter(source)
         obs.obs_source_release(source)
     end
@@ -404,7 +427,7 @@ function script_update(settings_data)
     end
 end
 
--- 定时器回调
+-- 定时器回调，每100毫秒更新滤镜和晃动效果
 function timer_callback()
     if not settings then
         print("设置未初始化，跳过定时器回调")
@@ -415,6 +438,8 @@ function timer_callback()
     if not source then
         return
     end
+
+    local current_time = os.clock() * 1000
 
     -- 滤镜去重逻辑
     if obs.obs_data_get_bool(settings, "dedup_enabled") and license_valid then
@@ -443,7 +468,6 @@ function timer_callback()
                 end
             end
 
-            local current_time = os.clock() * 1000
             local interval = obs.obs_data_get_int(settings, "dedup_update_interval")
             if dedup_transition_time < dedup_transition_duration then
                 dedup_transition_time = dedup_transition_time + 100
@@ -460,13 +484,13 @@ function timer_callback()
             end
         end
     else
-        dedup_update_filter() -- 检查是否需要移除滤镜
+        dedup_update_filter()
     end
 
     -- 晃动模糊逻辑
-    if shake_enabled then
-        shake_timer = shake_timer + 0.1
-        shake_log_timer = shake_log_timer + 0.1
+    if shake_enabled and (current_time - shake_last_update >= shake_update_interval) then
+        shake_timer = shake_timer + (shake_update_interval / 1000)
+        shake_log_timer = shake_log_timer + (shake_update_interval / 1000)
 
         local dynamic_amplitude = shake_amplitude
         if not license_valid or not check_time_tampering() then
@@ -490,23 +514,23 @@ function timer_callback()
         end
 
         shake_update_filter(source)
-    else
-        shake_update_filter(source) -- 确保关闭时更新日志
+        shake_last_update = current_time
+    elseif not shake_enabled then
+        shake_update_filter(source)
     end
 
     obs.obs_source_release(source)
 end
 
--- 脚本加载
+-- 脚本加载，初始化设置和定时器
 function script_load(settings_data)
     math.randomseed(os.time())
     settings = settings_data
-    license_valid = verify_license(license_file_path)
     print("[加载] 脚本初始化，许可证状态: " .. (license_valid and "有效" or "无效"))
     obs.timer_add(timer_callback, 100)
 end
 
--- 脚本卸载
+-- 脚本卸载，清理资源
 function script_unload()
     obs.timer_remove(timer_callback)
     if dedup_filter then

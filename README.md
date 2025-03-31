@@ -1,96 +1,101 @@
-# OBS视频特效脚本
+# OBS视频特效脚本 - 详细说明文档
 
-## 概述 Overview
-本仓库包含两个用于OBS Studio的Lua脚本：
-1. camera_physics.lua - 模拟真实镜头的晃动和缩放模糊效果
-2. video_color.lua - 动态调整滤镜参数实现视频去重效果
+## 独立插件
 
-## 功能描述 Features
-
-### camera_physics.lua 模拟真实镜头的晃动和缩放模糊效果
-
+### 1. camera_physics.lua 插件
 #### 功能概述
-此脚本为 OBS 添加了镜头晃动和动态模糊效果，适用于模拟手持相机或增强画面动感。晃动通过物理模型实现，模糊与晃动速度关联，并支持动画效果。
-
 - 模拟真实相机抖动效果
 - 可调节晃动幅度和频率
 - 支持缩放模糊效果
 - 提供开关控制，实时启用/禁用效果
 - 支持模糊和晃动解耦
 
-![camera_physics](https://cdn.z.wiki/autoupload/20250325/uiIY/661X710/camera-physics.png)
-
 #### 安装步骤
-1. 将此脚本文件（.lua）加载到 OBS 的“脚本”菜单。
-2. 首先安装OBS ShaderFilter，可直接到releases界面使用exe文件进行安装。安装之后的路径在obs根目录下的[path\to\obs-studio\data\obs-plugins\obs-shaderfilter]，下载并安装配套的 zoom_blur.shader 文件（需放入 OBS 的 shader 目录（其实放哪都可以））。
-3. 在 OBS 中为目标视频源添加“用户定义的着色器”滤镜，命名为 "zoom_blur_filter"，并选择 zoom_blur.shader，shader已经进行特定场景优化，归一化颜色，可在发布界面进行获取！
-![zoom_blur_shader](https://cdn.z.wiki/autoupload/20250325/ezcb/838X671/zoom-blur-shader.png)
-4. 在脚本属性中选择视频源并调整参数。
+1. 下载 camera_physics.lua 文件
+2. 打开 OBS Studio
+3. 导航至 "工具" -> "脚本"
+4. 点击"+"号添加新脚本
+5. 选择下载的 camera_physics.lua 文件
+6. 安装 OBS ShaderFilter 插件：
+   - 下载地址：https://github.com/exeldro/obs-shaderfilter/releases
+   - 安装路径：下一步下一步安装即可
+7. 下载 zoom_blur.shader 文件并放置在 shader 目录下（使用我优化过后的zoom_blur.shader,在文件夹shader里）
 
-#### 参数说明
-- **视频源**: 选择需要应用效果的 OBS 源。
-- **启用脚本**: 开/关整个效果，默认开启。
-- **晃动幅度 (0-20)**: 控制画面偏移的大小，默认 3.0。值越大晃动越剧烈。
-- **晃动频率 (0.01-1.0)**: 控制晃动变化的快慢，默认 0.5。值越大晃动越频繁。
-- **模糊强度 (0-1)**: 基础模糊程度，默认 0.5。值越大画面越模糊。
-- **模糊速度关联度 (0-1)**: 模糊与晃动速度的关联强度，默认 0.2。设为 0 则模糊固定，1 则随速度增强。
-- **采样次数 (0-100)**: Shader 的模糊采样点数，默认 32。值越高模糊越细腻，但性能开销增加。
-- **动画速度 (%) (0-100)**: 控制模糊的动画速度，默认 0。值越大动画越快，0 表示无动画。
-
-#### 最佳实践
-1. **轻微晃动效果**: 推荐 `晃动幅度 = 1.0-3.0`，`模糊强度 = 0.3-0.5`，`模糊速度关联度 = 0.2-0.4`，`动画速度 = 0`，模拟自然手持镜头。
-2. **剧烈晃动效果**: 设置 `晃动幅度 = 5.0-10.0`，`模糊强度 = 0.7-1.0`，`模糊速度关联度 = 0.5-1.0`，适合动态场景。
-3. **动画增强**: 调高 `动画速度` 到 10-50，搭配较低 `采样次数`（如 16-32），避免性能问题。
-4. **性能优化**: 保持 `采样次数` 在 16-32 之间，高分辨率下避免超过 64，以维持帧率。
-5. **调试**: 启用脚本日志（OBS 脚本窗口），观察 "Dynamic blur" 和 "Speed" 值，确保效果符合预期。
-
-#### 注意事项
-- 确保视频源已添加名为 "zoom_blur_filter" 的 Shader 滤镜，否则模糊无效。
-- 高 `采样次数` 或 `动画速度` 可能增加 GPU 负载，低配设备需谨慎调整。
-- 若模糊不够强，可微调 `模糊速度关联度`，但避免过高以防画面过模糊。
-- 动画速度与晃动节奏独立，需手动协调以获得最佳效果。
-
-### video_color.lua 动态调整滤镜参数实现视频去重效果
+### 2. video_color.lua 插件
+#### 功能概述
 - 动态调整视频色彩参数
 - 参数范围可自定义
 - 支持平滑过渡效果
 - 提供开关控制，实时启用/禁用滤镜
 
-![video_color](https://cdn.z.wiki/autoupload/20250325/jjbs/780X762/video-color.png)
+#### 安装步骤
+1. 下载 video_color.lua 文件
+2. 打开 OBS Studio
+3. 导航至 "工具" -> "脚本"
+4. 点击"+"号添加新脚本
+5. 选择下载的 video_color.lua 文件
 
+## 组合插件
+#### 功能概述
+- 同时包含镜头晃动和视频去重效果
+- 参数可独立调节
+- 支持效果叠加
+![组合插件](https://hv.z.wiki/autoupload/20250331/C30D/1578X1888/Snipaste-2025-03-31-14-20-37.png)
+#### 安装步骤
+1. 下载 combine_real_time_deduplication 文件夹
+2. 打开 OBS Studio
+3. 导航至 "工具" -> "脚本"
+4. 点击"+"号添加新脚本
+5. 选择 video_effects.lua 文件
+6. 确保已安装 OBS ShaderFilter 插件和 zoom_blur.shader 文件
 
-## 安装方法 Installation
+## 文件结构
+```
+.gitignore
+README.md
+test.html
+combine_real_time_deduplication/
+  key.py
+  last_run.txt
+  license.key
+  video_effects.lua
+shader/
+  zoom_blur.shader
+single_camera_physics/
+  camera_physics_key.lua
+  camera_physics_obfuscated.lua
+  camera_physics.lua
+single_video_color/
+  video_color_key_obfuscated.lua
+  video_color_key.lua
+  video_color.lua
+static/
+  知识星球.jpg
+  camera_physics.png
+  video_color.png
+  zoom_blur_shader.png
+```
+
+## 许可证验证
+- 使用license.key文件进行功能验证
+- 包含异或解密和简单哈希验证机制
+- 检测时间篡改以防止绕过许可证
+- 未激活时功能受限
+
+## 安装与使用
 1. 下载脚本文件
 2. 打开OBS Studio
 3. 导航至 "工具" -> "脚本"
 4. 点击"+"号添加新脚本
 5. 选择下载的Lua脚本文件
 
-## 使用方法 Usage
-### camera_physics.lua
-1. 添加脚本后选择目标视频源
-2. 调节晃动参数：
-   - 晃动幅度
-   - 晃动频率
-   - 模糊强度
-3. 使用开关启用/禁用效果
-
-### video_color.lua
-1. 添加脚本后选择目标视频源
-2. 设置参数范围：
-   - 亮度
-   - 对比度
-   - 饱和度
-   - 色彩偏移
-3. 设置更新间隔
-4. 使用开关启用/禁用滤镜
-
-## 注意事項 Notes
-- 使用zoom_blur.shader需要安装OBS ShaderFilter插件, 感谢OBS ShaderFilter提供的模糊晃动效果。https://github.com/exeldro/obs-shaderfilter
+## 注意事项
+- 使用zoom_blur.shader需要安装OBS ShaderFilter插件
 - 参数调整建议逐步进行，避免突变
 - 可根据实际需求调整参数范围
+- 高采样次数或动画速度可能增加GPU负载
 
-## 维护者 Maintainer
+## 维护者
 B站： @大成子ONLYYOU https://space.bilibili.com/341867068
 
 加入知识星球获取更多好货
